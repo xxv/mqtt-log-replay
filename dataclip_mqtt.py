@@ -13,7 +13,7 @@ from dataclip_source import DataClipSource
 class MQTTTarget(MQTTBase, PlaybackTarget):
     def __init__(self, config_file):
         MQTTBase.__init__(self, config_file=config_file)
-        self._topic = 'iot/order'
+        self._topic = 'event'
 
     def on_connect(self, client, userdata, flags, conn_result):
         print("Connected to MQTT server.")
