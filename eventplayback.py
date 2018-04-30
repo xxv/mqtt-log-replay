@@ -35,6 +35,8 @@ class PlaybackTarget(object):
     def on_event(self, event):
         """Called when an event occurs."""
         raise Exception("must implement this method")
+    def debug_message(self, message):
+        print(message)
 
 
 class DebugTarget(PlaybackTarget):
@@ -65,14 +67,14 @@ class EventPlayback(object):
         last_load = None
         while True:
             self._load_lock.wait()
-            print("Loading events...")
+            self._target.debug_message("Loading events...")
 
             interval = int(self._load_window.total_seconds() * 1000)
             end = EventPlayback._to_ms(datetime.now() - self._playback_offset) + interval
             if last_load:
                 delay = max(0, (last_load + interval/2) - end)
                 if delay:
-                    print("Reloading too fast. Waiting...")
+                    self._target.debug_message("Reloading too fast. Waiting...")
                 time.sleep(delay / 1000)
                 end = EventPlayback._to_ms(datetime.now() - self._playback_offset) + interval
             else:
@@ -80,7 +82,7 @@ class EventPlayback(object):
             events = self._event_source.events(last_load, end)
             for event in events:
                 self._events_queue.put(event)
-            print("Loaded {:d} events.".format(len(events)))
+            self._target.debug_message("Loaded {:d} events.".format(len(events)))
             last_load = end
             self._load_lock.clear()
 

@@ -21,6 +21,10 @@ class MQTTTarget(MQTTBase, PlaybackTarget):
     def on_event(self, event):
         self.mqtt.publish(self._topic, json.dumps(event))
 
+    def debug_message(self, message):
+        self.mqtt.publish('dataclip_mqtt/debug', message)
+        print(message)
+
 
 def main():
     if len(sys.argv) != 3:
