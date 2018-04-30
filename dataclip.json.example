@@ -1,3 +1,5 @@
 {
-"url": "https://dataclips.heroku.com/your/heroku/dataclip/url/here.csv"
+"url": "https://dataclips.heroku.com/your/heroku/dataclip/url/here.csv",
+"window_offset": 165,
+"window_size": 60
 }

@@ -20,9 +20,19 @@ class DataClipSource(EventSource):
         with open(config_file) as config_in:
             config = json.load(config_in)
             self.url = config['url']
+            self._window_size = config['window_size']
+            self._window_offset = config['window_offset']
 
     def get_date(self, event):
         return self.date_parser.parse(event['created_at']+'Z')
+
+    @property
+    def window_size(self):
+        return self._window_size
+
+    @property
+    def window_offset(self):
+        return self._window_offset
 
     def read_clip(self):
         result = requests.get(self.url)

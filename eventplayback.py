@@ -19,6 +19,14 @@ class EventSource(object):
         """Gets the date for the given event"""
         pass
 
+    @property
+    def window_size(self):
+        """Returns the window size, in seconds."""
+
+    @property
+    def window_offset(self):
+        """Returns the window playback offset, in seconds."""
+
 
 class PlaybackTarget(object):
     def on_event(self, event):
@@ -37,15 +45,11 @@ class EventPlayback(object):
     event = None
     offset_event_time = None
 
-    def __init__(self, target, event_source, load_window, playback_offset, min_buffer_size=40):
-        """
-        load_window in seconds
-        playback_offset in seconds
-        """
+    def __init__(self, target, event_source, min_buffer_size=40):
         self.target = target
         self.event_source = event_source
-        self.load_window = datetime.timedelta(seconds=load_window)
-        self.playback_offset = datetime.timedelta(seconds=playback_offset)
+        self.load_window = datetime.timedelta(seconds=event_source.window_size)
+        self.playback_offset = datetime.timedelta(seconds=event_source.window_offset)
         self.min_buffer_size = min_buffer_size
 
     def to_microseconds(self, atime):
