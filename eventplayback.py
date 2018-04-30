@@ -1,7 +1,7 @@
 """Event playback"""
 
 from __future__ import print_function
-import datetime
+from datetime import datetime, timedelta
 import time
 import threading
 import queue
@@ -9,27 +9,31 @@ import pytz
 
 
 class EventSource(object):
-    """A time-windowed source of events"""
+    """A time-windowed source of events."""
 
     def events(self, start, end):
-        """Return a list of events within the time window"""
+        """Return a list of events within the time window."""
         pass
 
     def get_date(self, event):
-        """Gets the date for the given event"""
+        """Get the date for the given event."""
         pass
 
     @property
     def window_size(self):
-        """Returns the window size, in seconds."""
+        """Return the window size, in seconds."""
+        pass
 
     @property
     def window_offset(self):
-        """Returns the window playback offset, in seconds."""
+        """Return the window playback offset, in seconds."""
+        pass
 
 
 class PlaybackTarget(object):
+    """A class that receives on_event() callbacks."""
     def on_event(self, event):
+        """Called when an event occurs."""
         raise Exception("must implement this method")
 
 
@@ -40,60 +44,64 @@ class DebugTarget(PlaybackTarget):
 
 class EventPlayback(object):
     """Replays the events from the given EventSource to the PlaybackTarget"""
-    events_queue = queue.Queue()
-    load_lock = threading.Event()
-    event = None
-    offset_event_time = None
 
     def __init__(self, target, event_source, min_buffer_size=40):
-        self.target = target
-        self.event_source = event_source
-        self.load_window = datetime.timedelta(seconds=event_source.window_size)
-        self.playback_offset = datetime.timedelta(seconds=event_source.window_offset)
-        self.min_buffer_size = min_buffer_size
+        self._events_queue = queue.Queue()
+        self._load_lock = threading.Event()
+        self._event = None
+        self._offset_event_time = None
+        self._target = target
+        self._event_source = event_source
+        self._load_window = timedelta(seconds=event_source.window_size)
+        self._playback_offset = timedelta(seconds=event_source.window_offset)
+        self._min_buffer_size = min_buffer_size
 
-    def to_microseconds(self, atime):
+    @staticmethod
+    def _to_ms(atime):
+        """Convert a datetime to milliseconds."""
         return int(time.mktime(atime.timetuple()) * 1000 + atime.microsecond/1000)
 
-    def load_events(self):
+    def _load_events(self):
         last_load = None
         while True:
-            self.load_lock.wait()
+            self._load_lock.wait()
             print("Loading events...")
 
-            interval = int(self.load_window.total_seconds() * 1000)
-            end = self.to_microseconds(datetime.datetime.now() - self.playback_offset) + interval
+            interval = int(self._load_window.total_seconds() * 1000)
+            end = EventPlayback._to_ms(datetime.now() - self._playback_offset) + interval
             if last_load:
                 delay = max(0, (last_load + interval/2) - end)
                 if delay:
                     print("Reloading too fast. Waiting...")
                 time.sleep(delay / 1000)
-                end = self.to_microseconds(datetime.datetime.now() - self.playback_offset) + interval
+                end = EventPlayback._to_ms(datetime.now() - self._playback_offset) + interval
             else:
                 last_load = end - interval
-            events = self.event_source.events(last_load, end)
+            events = self._event_source.events(last_load, end)
             for event in events:
-                self.events_queue.put(event)
+                self._events_queue.put(event)
             print("Loaded {:d} events.".format(len(events)))
             last_load = end
-            self.load_lock.clear()
+            self._load_lock.clear()
 
     def start(self):
-        thread = threading.Thread(target=self.load_events)
+        """Start the playback thread."""
+        thread = threading.Thread(target=self._load_events)
         thread.daemon = True
         thread.start()
 
     def tick(self):
+        """Call this periodically from your animation thread to deliver events."""
         # if the buffer is low, fill it up
-        if self.events_queue.qsize() < self.min_buffer_size and not self.load_lock.is_set():
-            self.load_lock.set()
-        if not self.event:
+        if self._events_queue.qsize() < self._min_buffer_size and not self._load_lock.is_set():
+            self._load_lock.set()
+        if not self._event:
             try:
-                self.event = self.events_queue.get(block=False)
-                self.offset_event_time = self.event_source.get_date(self.event) + self.playback_offset
+                self._event = self._events_queue.get(block=False)
+                self._offset_event_time = self._event_source.get_date(self._event) + self._playback_offset
             except queue.Empty:
-                self.event = None
-        if self.event and self.offset_event_time <= datetime.datetime.now(tz=pytz.utc):
+                self._event = None
+        if self._event and self._offset_event_time <= datetime.now(tz=pytz.utc):
             print('.', end='', flush=True)
-            self.target.on_event(self.event)
-            self.event = None
+            self._target.on_event(self._event)
+            self._event = None

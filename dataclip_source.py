@@ -1,30 +1,32 @@
 """Heroku dataclip event source"""
 
 import csv
+from datetime import datetime
 import json
 import time
-import urllib
-import urllib.request
 import requests
 import dateutil.parser
-from datetime import datetime
 
 from eventplayback import EventSource
 
 
 class DataClipSource(EventSource):
-    date_parser = dateutil.parser
+    """A source of events, replayed from a Heroku dataclip.
+
+    See dataclip.json.example for a sample config file."""
 
     def __init__(self, config_file):
-        config = None
+        self._date_parser = dateutil.parser
+
         with open(config_file) as config_in:
             config = json.load(config_in)
             self.url = config['url']
             self._window_size = config['window_size']
             self._window_offset = config['window_offset']
+            self._time_column = config['time_column']
 
     def get_date(self, event):
-        return self.date_parser.parse(event['created_at']+'Z')
+        return self._date_parser.parse(event[self._time_column]+'Z')
 
     @property
     def window_size(self):
@@ -34,19 +36,20 @@ class DataClipSource(EventSource):
     def window_offset(self):
         return self._window_offset
 
-    def read_clip(self):
+    def _read_clip(self):
         result = requests.get(self.url)
 
         if result.status_code == 200:
             return list(csv.DictReader(result.text.splitlines()))
-        else:
-            print("Error accessing data: {}".format(result))
-            return []
+
+        print("Error accessing data: {}".format(result))
+        return []
 
     def events(self, start, end):
-        print("Window: {} and {}".format(datetime.fromtimestamp(start/1000), datetime.fromtimestamp(end/1000)))
+        print("Window: {} and {}".format(datetime.fromtimestamp(start/1000),
+                                         datetime.fromtimestamp(end/1000)))
         try:
-            unfiltered_events = self.read_clip()
+            unfiltered_events = self._read_clip()
             events = [event for event in unfiltered_events
                       if start <= (self.get_date(event).timestamp() * 1000) < end]
             events_earlier = [event for event in unfiltered_events
@@ -63,6 +66,6 @@ class DataClipSource(EventSource):
             return events
 
         except requests.RequestException as err:
-            print("Got an error polling the dataclip. Waiting a minute and retrying...")
+            print("Got an error polling the dataclip <{}>. Waiting a minute and retrying...".format(err))
             time.sleep(60)
         return []
