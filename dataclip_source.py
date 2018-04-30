@@ -37,10 +37,18 @@ class DataClipSource(EventSource):
         print("Window: {} and {}".format(datetime.fromtimestamp(start/1000), datetime.fromtimestamp(end/1000)))
         try:
             unfiltered_events = self.read_clip()
-            events = [event for event in unfiltered_events if start <= (self.get_date(event).timestamp() * 1000) < end]
+            events = [event for event in unfiltered_events
+                      if start <= (self.get_date(event).timestamp() * 1000) < end]
+            events_earlier = [event for event in unfiltered_events
+                              if (self.get_date(event).timestamp() * 1000) < start]
+            events_later = [event for event in unfiltered_events
+                            if (self.get_date(event).timestamp() * 1000) >= end]
+            print("{:d}/{:d} events in window ({:d} earlier, {:d} later)".format(
+                len(events), len(unfiltered_events), len(events_earlier), len(events_later)))
             print("{:d}/{:d} events in window".format(len(events), len(unfiltered_events)))
             if unfiltered_events:
-                print("First is {} last is {}".format(self.get_date(unfiltered_events[0]), self.get_date(unfiltered_events[-1])))
+                print("First is {} last is {}".format(
+                    self.get_date(unfiltered_events[0]), self.get_date(unfiltered_events[-1])))
 
             return events
 
