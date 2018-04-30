@@ -29,14 +29,24 @@ class EventSource(object):
         """Return the window playback offset, in seconds."""
         pass
 
+    @property
+    def stats(self):
+        """Return a dictionary of stats."""
+        return {}
+
 
 class PlaybackTarget(object):
     """A class that receives on_event() callbacks."""
+
     def on_event(self, event):
         """Called when an event occurs."""
         raise Exception("must implement this method")
+
     def debug_message(self, message):
         print(message)
+
+    def publish_stats(self, stats):
+        print(stats)
 
 
 class DebugTarget(PlaybackTarget):
@@ -52,6 +62,8 @@ class EventPlayback(object):
         self._load_lock = threading.Event()
         self._event = None
         self._offset_event_time = None
+        self._stats_interval = timedelta(seconds=1)
+        self._stats_last_publish = None
         self._target = target
         self._event_source = event_source
         self._load_window = timedelta(seconds=event_source.window_size)
@@ -62,6 +74,13 @@ class EventPlayback(object):
     def _to_ms(atime):
         """Convert a datetime to milliseconds."""
         return int(time.mktime(atime.timetuple()) * 1000 + atime.microsecond/1000)
+
+    def _publish_stats(self):
+        stats = {}
+        stats['buffer_size'] = self._events_queue.qsize()
+        stats['min_buffer_size'] = self._min_buffer_size
+        stats['source'] = self._event_source.stats
+        self._target.publish_stats(stats)
 
     def _load_events(self):
         last_load = None
@@ -107,3 +126,8 @@ class EventPlayback(object):
             print('.', end='', flush=True)
             self._target.on_event(self._event)
             self._event = None
+        now = datetime.now()
+        if not self._stats_last_publish or (
+                now > (self._stats_last_publish + self._stats_interval)):
+            self._publish_stats()
+            self._stats_last_publish = now
