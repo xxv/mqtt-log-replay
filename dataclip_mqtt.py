@@ -39,7 +39,7 @@ def main():
     mqtt_thread = Thread(target=target.loop_forever)
     mqtt_thread.start()
     source = DataClipSource(sys.argv[2])
-    event_playback = EventPlayback(target, source)
+    event_playback = EventPlayback(target, source, min_buffer_size=60)
     event_playback.start()
     while True:
         event_playback.tick()
