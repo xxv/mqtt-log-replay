@@ -22,7 +22,7 @@ class MQTTTarget(MQTTBase, PlaybackTarget):
         self.mqtt.publish(self._topic, json.dumps(event))
 
     def debug_message(self, message):
-        self.mqtt.publish('dataclip_mqtt/debug', message)
+        self.mqtt.publish('dataclip_mqtt/debug', json.dumps(message))
         print(message)
 
     def publish_stats(self, stats):
