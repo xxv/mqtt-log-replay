@@ -82,6 +82,14 @@ class EventPlayback(object):
         stats['source'] = self._event_source.stats
         self._target.publish_stats(stats)
 
+    def _publish_stats_periodically(self):
+        now = datetime.now()
+        if not self._stats_last_publish or (
+                now > (self._stats_last_publish + self._stats_interval)):
+            self._publish_stats()
+            self._stats_last_publish = now
+
+
     def _load_events(self):
         last_load = None
         while True:
@@ -105,6 +113,23 @@ class EventPlayback(object):
             last_load = end
             self._load_lock.clear()
 
+    def _refresh_buffer(self):
+        if self._events_queue.qsize() < self._min_buffer_size and not self._load_lock.is_set():
+            self._load_lock.set()
+
+    def _get_event_from_queue(self):
+        """Return a tuple of the event and the realtime that it should be triggered"""
+        event = None
+        offset_event_time = None
+
+        try:
+            event = self._events_queue.get(block=False)
+            offset_event_time = self._event_source.get_date(event) + self._playback_offset
+        except queue.Empty:
+            pass
+
+        return (event, offset_event_time)
+
     def start(self):
         """Start the playback thread."""
         thread = threading.Thread(target=self._load_events)
@@ -113,21 +138,15 @@ class EventPlayback(object):
 
     def tick(self):
         """Call this periodically from your animation thread to deliver events."""
-        # if the buffer is low, fill it up
-        if self._events_queue.qsize() < self._min_buffer_size and not self._load_lock.is_set():
-            self._load_lock.set()
+
+        self._refresh_buffer()
+
         if not self._event:
-            try:
-                self._event = self._events_queue.get(block=False)
-                self._offset_event_time = self._event_source.get_date(self._event) + self._playback_offset
-            except queue.Empty:
-                self._event = None
+            (self._event, self._offset_event_time) = self._get_event_from_queue()
+
         if self._event and self._offset_event_time <= datetime.now(tz=pytz.utc):
             print('.', end='', flush=True)
             self._target.on_event(self._event)
             self._event = None
-        now = datetime.now()
-        if not self._stats_last_publish or (
-                now > (self._stats_last_publish + self._stats_interval)):
-            self._publish_stats()
-            self._stats_last_publish = now
+
+        self._publish_stats_periodically()
