@@ -27,6 +27,7 @@ class MQTTBase(object):
             self.mqtt.tls_set(self.mqtt_config['ca_certs'], tls_version=ssl.PROTOCOL_TLSv1_2)
 
         if 'user' in self.mqtt_config:
+            print("connecting as {}".format(self.mqtt_config['user']))
             self.mqtt.username_pw_set(self.mqtt_config['user'], self.mqtt_config['password'])
         self.mqtt.connect(self.mqtt_config['host'], self.mqtt_config['port'])
 

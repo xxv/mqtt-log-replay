@@ -89,6 +89,9 @@ class EventPlayback(object):
             self._publish_stats()
             self._stats_last_publish = now
 
+    def _load_window(self, start_time):
+        window_ms = int(self._load_window.total_seconds() * 1000)
+
 
     def _load_events(self):
         last_load = None
